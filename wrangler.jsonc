@@ -1,0 +1,56 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  /* ------------------------------------------------------------------
+     本番（prod）と検証用（dev）は、Worker もデータベースも完全に別。
+       本番:   npm run deploy:prod → wave-journal.puccho082.workers.dev     / D1 wave-journal
+       検証用: npm run deploy:dev  → wave-journal-dev.puccho082.workers.dev / D1 wave-journal-dev
+     動作確認・テストデータの投入は必ず dev で。本番のデータベースで試さない・消さない。
+
+     合言葉（APP_KEY）:
+       本番は秘密の値。ユーザー本人が `npx wrangler secret put APP_KEY` で決める（ここには書かない）。
+       未設定のあいだ、本番は全部閉じている（記録は見えない・書けない）。
+       検証用は中身がテストデータだけなので、下の vars に固定値を置いている。
+     ------------------------------------------------------------------ */
+
+  "name": "wave-journal",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": { "APP_ENV": "prod" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wave-journal",
+      "database_id": "39fc8b1e-1e61-4a9f-9aa9-066ddb2894d9",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true },
+
+  "env": {
+    "dev": {
+      "name": "wave-journal-dev",
+      "assets": {
+        "directory": "./public",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*"]
+      },
+      "vars": { "APP_ENV": "dev", "APP_KEY": "dev-only-test-key" },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "wave-journal-dev",
+          "database_id": "da921aec-9682-4ca1-9132-f01bf440f62f",
+          "migrations_dir": "migrations"
+        }
+      ]
+    }
+  }
+}

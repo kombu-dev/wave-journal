@@ -1,0 +1,18 @@
+{
+  "name": "wave-journal",
+  "private": true,
+  "scripts": {
+    "test": "node tests/api.test.mjs",
+    "deploy": "node tests/api.test.mjs && wrangler deploy",
+    "deploy:prod": "node tests/api.test.mjs && wrangler deploy",
+    "deploy:dev": "node tests/api.test.mjs && wrangler deploy --env dev",
+    "migrate:dev": "wrangler d1 migrations apply wave-journal-dev --remote --env dev",
+    "migrate:prod": "node tools/backup-prod.js && wrangler d1 migrations apply wave-journal --remote",
+    "backup:prod": "node tools/backup-prod.js",
+    "set-key": "wrangler secret put APP_KEY",
+    "icons": "node tools/make-icons.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.129.1"
+  }
+}

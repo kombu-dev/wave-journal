@@ -1,0 +1,16 @@
+/* 見た目はほぼすべて app.js のインラインスタイル（旧版 wave-journal.html の React と同じ値）。
+   ここには旧版の <style> と、旧版に無かったもの（検証用の帯）だけを置く。 */
+html, body { margin: 0; padding: 0; background: #0F0F1A; overflow-x: hidden; }
+* { box-sizing: border-box; }
+
+/* 検証用（dev）とローカルだけに出る黄黒の帯。本番には出ない */
+.env-banner {
+  padding: 6px 16px;
+  background: repeating-linear-gradient(135deg, #f5c400 0 14px, #1a1a1a 14px 28px);
+  color: #000;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+.env-banner span { background: #f5c400; padding: 1px 8px; }

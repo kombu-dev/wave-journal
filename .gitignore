@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.dev.vars
+.env
+
+# serve-local のデータ（本番とも検証用とも無関係）
+.local/
+
+# 本番DBのバックアップ（個人の記録なので Git に入れない）
+backups/
