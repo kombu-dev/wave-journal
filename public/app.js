@@ -55,7 +55,7 @@
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { /* JSON でない */ }
-    if (res.status === 401 && data && data.code === 'auth') { showGate(); throw new AuthError('合言葉を入れてください'); }
+    if (res.status === 401 && data && data.code === 'auth') { S.google = !!data.google; showGate(); throw new AuthError('合言葉を入れてください'); }
     if (!res.ok) {
       const e = new Error((data && data.error) || `通信に失敗しました（${res.status}）`);
       e.code = data && data.code;
@@ -70,6 +70,8 @@
     mode: 'loading',       // loading | gate | app
     gateMsg: '',
     gateNoKey: false,
+    google: false,         // サーバーに Google ログインの設定があるか（あれば入口の主役は Google）
+    showKey: false,        // 「合言葉で入る」を押して、予備の合言葉の欄を出しているか
     entries: [],           // 生きている記録（日付順）
     view: 'input',
     logRange: 'week',
@@ -183,6 +185,14 @@
   }
 
   function gateHtml() {
+    // Google の設定があれば「Googleでログイン」を主役に。合言葉は下の小さなリンクから出す予備の入口
+    if (S.google && !S.showKey && !S.gateNoKey) {
+      return `<div>
+        <a href="/auth/google" style="display:block;text-align:center;text-decoration:none;width:100%;padding:14px;border-radius:12px;font-size:14px;font-weight:600;letter-spacing:0.05em;background:linear-gradient(135deg, #A78BFACC, #A78BFA88);color:#0F0F1A;box-shadow:0 4px 20px #A78BFA40;">Googleでログイン</a>
+        <div style="margin-top:12px;font-size:11px;color:#4B5563;text-align:center;">一度入れば、この端末ではしばらく聞きません。</div>
+        <div style="margin-top:28px;text-align:center;"><button type="button" data-act="show-key" style="${ST.quietBtn}color:#6B7280;text-decoration:underline;">合言葉で入る</button></div>
+      </div>`;
+    }
     return `<form id="loginForm" autocomplete="on">
       ${S.gateNoKey ? '' : `<div style="margin-bottom:24px;">
         <div style="${ST.label(10)}">合言葉</div>
@@ -192,6 +202,7 @@
       <button type="submit" style="width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:14px;font-weight:600;letter-spacing:0.05em;background:linear-gradient(135deg, #A78BFACC, #A78BFA88);color:#0F0F1A;box-shadow:0 4px 20px #A78BFA40;">開く</button>
       <div style="margin-top:12px;font-size:11px;color:#4B5563;text-align:center;">一度入れれば、この端末ではしばらく聞きません。</div>`}
       ${S.gateMsg ? `<div style="margin-top:14px;font-size:12px;color:${S.gateNoKey ? '#9CA3AF' : '#FB7185'};line-height:1.6;">${esc(S.gateMsg)}</div>` : ''}
+      ${S.google && !S.gateNoKey ? `<div style="margin-top:28px;text-align:center;"><a href="/auth/google" style="font-size:12px;color:#6B7280;">Googleでログインに戻る</a></div>` : ''}
     </form>`;
   }
 
@@ -478,7 +489,11 @@
     const el = ev.target.closest('[data-act]');
     if (!el || el.disabled) return;
     const act = el.dataset.act;
-    if (act === 'view') {
+    if (act === 'show-key') {
+      S.showKey = true;
+      render();
+      setTimeout(() => { const k = $('#keyInput'); if (k) k.focus(); }, 50);
+    } else if (act === 'view') {
       S.view = el.dataset.v;
       S.confirmDelete = false;
       if (S.view === 'log') loadTrash().then(() => { if (S.view === 'log') render(); });

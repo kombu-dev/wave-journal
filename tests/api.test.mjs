@@ -257,4 +257,8 @@ check('ログアウト後は見られない', r.status === 401);
 r = await call('GET', '/api/nothing');
 check('未知のAPIは401か404', r.status === 401 || r.status === 404);
 
+// ------------------------------------------------------------------ Googleでログイン
+const { runGoogleTests } = await import('./google-auth.test.mjs');
+await runGoogleTests({ createApp, root, check, cookieName: 'wj_session', sessionPath: '/api/session', protectedPath: '/api/entries' });
+
 done();

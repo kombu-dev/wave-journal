@@ -4,7 +4,9 @@
  *   /api/*  : JSON API（記録は D1）
  *   それ以外 : public/ の静的ファイル（ASSETS）
  *
- * 入口には合言葉がある（日々の心の状態の記録なので、URLを知っているだけでは見せない）。
+ * 入口は「Googleでログイン」（持ち主のGoogleアカウントだけ。src/google-auth.js）。予備に合言葉も残している。
+ *   Google の設定（GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / OWNER_EMAIL）が無いあいだは合言葉だけ。
+ *   どちらで入っても同じセッション Cookie（元は APP_KEY）。日々の心の状態の記録なので、URLを知っているだけでは見せない。
  *   合言葉は Worker の秘密の値 APP_KEY。未設定なら全部閉じる（fail closed）。
  *   一度入れた端末には 400 日有効の Cookie を置くので、毎回は聞かない。
  *
@@ -14,6 +16,8 @@
  *   - 書き出し / 読み込み。読み込みは追記だけ（同じ id は INSERT OR IGNORE で書かない）
  *     旧版（GitHub Pages 版）の書き出し JSON（[{date, value, note}, ...]）もそのまま読める
  */
+
+import { googleEnabled, handleGoogleAuth } from './google-auth.js';
 
 // ------------------------------------------------------------------ 小道具
 
@@ -286,7 +290,7 @@ async function handleApi(request, env, url) {
     const authed = devOpen || await isAuthed(request, env);
     // 開くたびに期限を 400 日先へ延ばす。使い続けている限り、合言葉を聞き直されない
     const headers = authed && !devOpen ? { 'set-cookie': sessionCookie(await sessionToken(env), SESSION_MAX_AGE) } : {};
-    return json({ configured: devOpen || !!env.APP_KEY, authed }, { headers });
+    return json({ configured: devOpen || !!env.APP_KEY, authed, google: googleEnabled(env) }, { headers });
   }
   const readJson = async () => { try { return await request.json(); } catch { return {}; } };
   if (path === '/api/login' && method === 'POST') return login(env, await readJson());
@@ -295,7 +299,7 @@ async function handleApi(request, env, url) {
   // ---- ここから先は合言葉が必要
   if (!devOpen) {
     if (!env.APP_KEY) return err(503, '合言葉がまだ設定されていません', { code: 'no_key' });
-    if (!(await isAuthed(request, env))) return err(401, '合言葉を入れてください', { code: 'auth' });
+    if (!(await isAuthed(request, env))) return err(401, '合言葉を入れてください', { code: 'auth', google: googleEnabled(env) });
   }
 
   const body = method === 'POST' || method === 'PUT' ? await readJson() : null;
@@ -325,6 +329,13 @@ async function handleApi(request, env, url) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/auth/')) {
+      const res = await handleGoogleAuth(request, env, url, {
+        appName: 'Wave Journal',
+        issueSession: async () => sessionCookie(await sessionToken(env), SESSION_MAX_AGE),
+      });
+      if (res) return res;
+    }
     if (url.pathname.startsWith('/api/')) {
       try {
         return await handleApi(request, env, url);

@@ -10,6 +10,8 @@
     "migrate:prod": "node tools/backup-prod.js && wrangler d1 migrations apply wave-journal --remote",
     "backup:prod": "node tools/backup-prod.js",
     "set-key": "wrangler secret put APP_KEY",
+    "set-google": "wrangler secret put GOOGLE_CLIENT_ID && wrangler secret put GOOGLE_CLIENT_SECRET && wrangler secret put OWNER_EMAIL",
+    "set-google:dev": "wrangler secret put GOOGLE_CLIENT_ID --env dev && wrangler secret put GOOGLE_CLIENT_SECRET --env dev && wrangler secret put OWNER_EMAIL --env dev",
     "icons": "node tools/make-icons.mjs"
   },
   "devDependencies": {

@@ -23,6 +23,22 @@
 
 検証用とローカルは画面の上に黄黒の帯が出る。本番には出ない。
 
+## Googleでログイン（2026-10-18〜。設定すると入口の主役になる）
+
+- 設定すると、入口の主役が「Googleでログイン」ボタンになる。入れるのは `OWNER_EMAIL` に書いた本人の Google アカウントだけ。ほかのアカウントだと「このGoogleアカウントでは入れません」と出て、「別のアカウントで試す」から選び直せる。
+- **合言葉は予備として残る**（入口の下の小さな「合言葉で入る」から今までの欄が出る）。どちらで入っても同じ Cookie（元は `APP_KEY`）なので、いまログインしている端末はそのまま使える。合言葉を変えると Google で入った端末もログアウトされる。
+- 設定は Worker の秘密の値3つ: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `OWNER_EMAIL`（カンマ区切りで複数可・大文字小文字は無視）。**1つでも欠けていると Google ログインは出ず、今までどおり合言葉の画面**（なのでコードを先にデプロイしても何も変わらない）。
+  - 本番: `npm run set-google`（3つを順に聞かれる）／検証用: `npm run set-google:dev`
+  - 登録した瞬間から効く（デプロイし直す必要はない）。設定できたかは `/api/session` の `google: true` で分かる。
+- Google Cloud Console の OAuth クライアント（種類は「ウェブ アプリケーション」）の「承認済みのリダイレクト URI」に次の2つを登録する:
+  - 本番: `https://wave-journal.puccho082.workers.dev/auth/google/callback`
+  - 検証用: `https://wave-journal-dev.puccho082.workers.dev/auth/google/callback`
+- 仕組み（`src/google-auth.js`。6アプリ共通の部品で依存ゼロ。直すときは6つとも同じに保つ）:
+  - `GET /auth/google` → state（乱数）を10分だけの Cookie（HttpOnly・Secure・SameSite=Lax）に入れて、Google のアカウント選択画面（`prompt=select_account`、`scope=openid email`）へ送る。
+  - `GET /auth/google/callback` → state を照合（違えば 400）→ `code` を Google のトークン窓口で交換（client_secret を使う）→ id_token の `aud`（自分のクライアント ID か）・`iss`・`exp`・`email_verified` とメールを確かめる → 持ち主なら合言葉と同じ Cookie を出して `/` へ。持ち主でなければ 403。
+  - **id_token の署名は検証していない**。id_token はブラウザを通らず、Worker が client_secret 付きで Google へ直接（TLS で）取りに行った応答の中にあるので、途中で差し替えられる余地がない。OpenID Connect の仕様（Core 3.1.3.7）でも、トークン窓口から直接受け取った場合は TLS の検証で代えてよいとされている。
+  - テストは `tests/google-auth.test.mjs`（Google のトークン窓口は fetch の差し替えで模擬。本物にはつながない）。
+
 ## 入口の合言葉
 
 日々の心の状態の記録なので、URLを知っているだけでは見られないようにしてある（selftalk と同じ仕組み）。

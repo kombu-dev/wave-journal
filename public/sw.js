@@ -1,7 +1,7 @@
 /* 静的ファイルだけを network-first でキャッシュ。/api/* は触らない（古い記録を見せない）。
    静的ファイルを大きく変えたら CACHE の番号を上げる。
    ※ GitHub Pages の旧版（リポジトリ直下の sw.js）とは別物。あちらは触らない。 */
-const CACHE = 'wave-journal-cf-v3';
+const CACHE = 'wave-journal-cf-v4';
 const SHELL = ['/', '/index.html', '/style.css', '/app.js', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (e) => {
@@ -20,7 +20,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+  // /auth/* は Google ログインの行き来（リダイレクトと Cookie）。キャッシュに触らせない
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
   e.respondWith(
     fetch(req)
       .then((res) => {
