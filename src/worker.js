@@ -77,6 +77,8 @@ function safeEqual(a, b) {
   return d === 0;
 }
 /** 合言葉を変えると、全端末の Cookie が自動的に無効になる */
+// 合言葉は全角・半角の違い（英数字・記号）と前後の空白を無視して照合する（NFKC）。日本語の合言葉もそのまま使える。
+const normKey = (s) => String(s ?? '').normalize('NFKC').trim();
 const sessionToken = (env) => hmac(env.APP_KEY, 'wave-journal-session-v1');
 
 function readCookie(request, name) {
@@ -100,7 +102,7 @@ async function login(env, body) {
   if (!env.APP_KEY) return err(503, '合言葉がまだ設定されていません', { code: 'no_key' });
   const given = str(body && body.key, 200);
   // 比べるのは HMAC 同士（長さの違いから推測されないように）
-  const ok = safeEqual(await hmac(env.APP_KEY, 'k:' + given), await hmac(env.APP_KEY, 'k:' + env.APP_KEY));
+  const ok = safeEqual(await hmac(env.APP_KEY, 'k:' + normKey(given)), await hmac(env.APP_KEY, 'k:' + normKey(env.APP_KEY)));
   if (!ok) {
     await new Promise((r) => setTimeout(r, 700));   // 総当たりを遅くする
     return err(401, '合言葉が違います');

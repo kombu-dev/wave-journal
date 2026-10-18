@@ -186,8 +186,8 @@
     return `<form id="loginForm" autocomplete="on">
       ${S.gateNoKey ? '' : `<div style="margin-bottom:24px;">
         <div style="${ST.label(10)}">合言葉</div>
-        <input id="keyInput" name="password" type="password" autocomplete="current-password" required
-          style="${ST.field}color-scheme:dark;">
+        <input id="keyInput" name="aikotoba" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" lang="ja" required
+          style="${ST.field}color-scheme:dark;-webkit-text-security:disc;text-security:disc;">
       </div>
       <button type="submit" style="width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:14px;font-weight:600;letter-spacing:0.05em;background:linear-gradient(135deg, #A78BFACC, #A78BFA88);color:#0F0F1A;box-shadow:0 4px 20px #A78BFA40;">開く</button>
       <div style="margin-top:12px;font-size:11px;color:#4B5563;text-align:center;">一度入れれば、この端末ではしばらく聞きません。</div>`}
