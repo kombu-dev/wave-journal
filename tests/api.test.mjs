@@ -76,6 +76,15 @@ check('Cookie は HttpOnly/Secure/400日', /HttpOnly/.test(sc) && /Secure/.test(
 
 r = await call('GET', '/api/session');
 check('開くたびに期限が延びる（Cookie を出し直す）', r.body.authed === true && /Max-Age=34560000/.test(r.headers.get('set-cookie') || ''));
+r = await call('GET', '/api/entries');
+check('画面の起動で最初に読む一覧でも期限が延びる', r.status === 200 && /Max-Age=34560000/.test(r.headers.get('set-cookie') || ''), r.headers.get('set-cookie'));
+{
+  const saved = cookie;
+  cookie = '';
+  r = await call('GET', '/api/entries');
+  check('合言葉なしの一覧は401で、Cookie は出さない', r.status === 401 && !r.headers.get('set-cookie'));
+  cookie = saved;
+}
 
 {
   const saved = app.env.APP_KEY;

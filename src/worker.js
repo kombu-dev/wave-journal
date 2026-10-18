@@ -298,7 +298,12 @@ async function handleApi(request, env, url) {
 
   const body = method === 'POST' || method === 'PUT' ? await readJson() : null;
 
-  if (path === '/api/entries' && method === 'GET') return listEntries(env);
+  if (path === '/api/entries' && method === 'GET') {
+    // 画面は起動時に session を呼ばずこれを最初に読むので、ここで Cookie の期限を 400 日先へ延ばす
+    const res = await listEntries(env);
+    if (!devOpen) res.headers.append('set-cookie', sessionCookie(await sessionToken(env), SESSION_MAX_AGE));
+    return res;
+  }
   if (path === '/api/trash' && method === 'GET') return listTrash(env);
 
   let m = path.match(/^\/api\/days\/([0-9-]{10})$/);

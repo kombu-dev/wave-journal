@@ -56,7 +56,11 @@
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { /* JSON でない */ }
     if (res.status === 401 && data && data.code === 'auth') { showGate(); throw new AuthError('合言葉を入れてください'); }
-    if (!res.ok) throw new Error((data && data.error) || `通信に失敗しました（${res.status}）`);
+    if (!res.ok) {
+      const e = new Error((data && data.error) || `通信に失敗しました（${res.status}）`);
+      e.code = data && data.code;
+      throw e;
+    }
     return data;
   }
 
@@ -78,6 +82,9 @@
     importMessage: '',
     trash: [],
     trashOpen: false,
+    loaded: false,         // 記録をサーバーから読み終えたか（読み終える前から入力画面は出しておく）
+    touched: false,        // 読み終える前に選んだり書いたりしたか（したなら、その入力を上書きしない）
+    confirmDelete: false,  // 「この日の記録を消す？ 消す／やめる」を出しているか
   };
 
   const targetEntry = () => S.entries.find((e) => e.date === S.targetDate);
@@ -95,7 +102,7 @@
     outer: "min-height:100vh;background:linear-gradient(160deg, #0F0F1A 0%, #1A1025 50%, #0F1A1A 100%);color:#E2E8F0;font-family:'Inter', sans-serif;padding:0;",
     inner: 'max-width:480px;margin:0 auto;padding:32px 20px 80px;',
     label: (mb) => `font-size:11px;color:#6B7280;letter-spacing:0.1em;margin-bottom:${mb}px;`,
-    field: 'width:100%;background:#1A1A2E;border:1.5px solid #2D2D44;border-radius:10px;padding:12px 14px;color:#E2E8F0;font-size:14px;outline:none;box-sizing:border-box;font-family:inherit;',
+    field: 'width:100%;background:#1A1A2E;border:1.5px solid #2D2D44;border-radius:10px;padding:12px 14px;color:#E2E8F0;font-size:16px;outline:none;box-sizing:border-box;font-family:inherit;',
     tab: (on) => `flex:1;padding:8px 0;border-radius:7px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;background:${on ? '#2D2D44' : 'transparent'};color:${on ? '#E2E8F0' : '#6B7280'};`,
     stateBtn: (opt, on) => `display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:12px;border:none;cursor:pointer;background:${on ? opt.color + '18' : '#1A1A2E'};outline:${on ? `1.5px solid ${opt.color}60` : '1.5px solid transparent'};transition:all 0.15s;text-align:left;`,
     stateDot: (opt, on) => `width:10px;height:10px;border-radius:50%;background:${on ? opt.color : '#374151'};box-shadow:${on ? `0 0 8px ${opt.color}80` : 'none'};transition:all 0.15s;flex-shrink:0;`,
@@ -180,22 +187,16 @@
       ${S.gateNoKey ? '' : `<div style="margin-bottom:24px;">
         <div style="${ST.label(10)}">合言葉</div>
         <input id="keyInput" name="password" type="password" autocomplete="current-password" required
-          style="${ST.field}font-size:16px;color-scheme:dark;">
+          style="${ST.field}color-scheme:dark;">
       </div>
-      <button type="submit" style="width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:14px;font-weight:600;letter-spacing:0.05em;background:linear-gradient(135deg, #A78BFACC, #A78BFA88);color:#0F0F1A;box-shadow:0 4px 20px #A78BFA40;">開く</button>`}
+      <button type="submit" style="width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:14px;font-weight:600;letter-spacing:0.05em;background:linear-gradient(135deg, #A78BFACC, #A78BFA88);color:#0F0F1A;box-shadow:0 4px 20px #A78BFA40;">開く</button>
+      <div style="margin-top:12px;font-size:11px;color:#4B5563;text-align:center;">一度入れれば、この端末ではしばらく聞きません。</div>`}
       ${S.gateMsg ? `<div style="margin-top:14px;font-size:12px;color:${S.gateNoKey ? '#9CA3AF' : '#FB7185'};line-height:1.6;">${esc(S.gateMsg)}</div>` : ''}
     </form>`;
   }
 
   function inputViewHtml() {
     const today = todayStr();
-    const t = targetEntry();
-    const notice = t && !S.saved
-      ? `<div style="background:#1E1E2E;border-radius:12px;padding:12px 16px;margin-bottom:24px;font-size:12px;color:#9CA3AF;border-left:3px solid ${getStateOption(t.value).color};">
-          ${S.targetDate === today ? '今日' : formatDate(S.targetDate)}はもう記録済み（${esc(getStateOption(t.value).label)}）。上書きできる。
-          <div><button type="button" data-act="delete-day" style="${ST.quietBtn}">この日の記録を消す</button></div>
-        </div>`
-      : '';
     const states = STATE_OPTIONS.map((opt) => {
       const on = S.selected === opt.value;
       return `<button type="button" data-act="pick" data-v="${opt.value}" style="${ST.stateBtn(opt, on)}">
@@ -212,7 +213,7 @@
         <div style="${ST.label(10)}">記録する日</div>
         <input id="dateInput" type="date" value="${esc(S.targetDate)}" max="${today}" style="${ST.field}color-scheme:dark;">
       </div>
-      ${notice}
+      <div id="noticeSlot">${noticeHtml(false)}</div>
       <div style="margin-bottom:28px;">
         <div style="${ST.label(14)}">今日の状態</div>
         <div style="display:flex;flex-direction:column;gap:8px;">${states}</div>
@@ -224,7 +225,41 @@
       </div>
       <button type="button" id="saveBtn" data-act="save" ${S.selected === null ? 'disabled' : ''} style="${ST.saveBtn(S.selected)}">${S.saved ? '✓ 記録した' : '記録する'}</button>
       ${S.saveError ? `<div style="margin-top:10px;font-size:12px;color:#FB7185;">${esc(S.saveError)}</div>` : ''}
+      <div id="delSlot">${deleteHtml(false)}</div>
     </div>`;
+  }
+
+  // 記録の読み込みが終わってから差し込むときは、ふわっと出す（0.2s）
+  const FADE = 'animation:wj-fade 0.2s ease-out;';
+
+  /** 「もう記録済み」の注記（旧版と同じ） */
+  function noticeHtml(fade) {
+    const t = targetEntry();
+    if (!t || S.saved) return '';
+    return `<div style="background:#1E1E2E;border-radius:12px;padding:12px 16px;margin-bottom:24px;font-size:12px;color:#9CA3AF;border-left:3px solid ${getStateOption(t.value).color};${fade ? FADE : ''}">
+        ${S.targetDate === todayStr() ? '今日' : formatDate(S.targetDate)}はもう記録済み（${esc(getStateOption(t.value).label)}）。上書きできる。
+      </div>`;
+  }
+
+  /** 「この日の記録を消す」。押すとその場で「消す／やめる」に変わる2段階 */
+  function deleteHtml(fade) {
+    const t = targetEntry();
+    if (!t) return '';
+    const link = (act, color, text) =>
+      `<button type="button" data-act="${act}" style="${ST.quietBtn}color:${color};">${text}</button>`;
+    const body = S.confirmDelete
+      ? `<span style="font-size:11px;">この日の記録を消す？　</span>${link('delete-yes', '#FB7185', '消す')}<span style="font-size:11px;"> ／ </span>${link('delete-no', '#6B7280', 'やめる')}
+         <div style="font-size:10px;color:#4B5563;margin-top:2px;">消した記録は『波を見る』の下から戻せます</div>`
+      : link('delete-day', '#4B5563', 'この日の記録を消す');
+    return `<div style="margin-top:14px;text-align:right;color:#4B5563;${fade ? FADE : ''}">${body}</div>`;
+  }
+
+  /** 注記と「消す」だけを描き直す（入力中のメモや選択を崩さない） */
+  function refreshDayParts(fade) {
+    const n = $('#noticeSlot');
+    const d = $('#delSlot');
+    if (n) n.innerHTML = noticeHtml(fade);
+    if (d) d.innerHTML = deleteHtml(fade);
   }
 
   function visibleEntries() {
@@ -267,9 +302,9 @@
     const none = S.entries.length === 0;
     const trash = S.trash.length > 0 || S.trashOpen
       ? `<div style="margin-top:14px;">
-          <button type="button" data-act="toggle-trash" style="${ST.quietBtn}">${S.trashOpen ? 'ゴミ箱を閉じる' : `ゴミ箱（${S.trash.length}件）`}</button>
+          <button type="button" data-act="toggle-trash" style="${ST.quietBtn}">${S.trashOpen ? '消した記録を閉じる' : '消した記録'}</button>
           ${S.trashOpen ? `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">
-            ${S.trash.length === 0 ? '<div style="font-size:12px;color:#4B5563;">ゴミ箱は空。</div>' : S.trash.map((e) => {
+            ${S.trash.length === 0 ? '<div style="font-size:12px;color:#4B5563;">消した記録はない。</div>' : S.trash.map((e) => {
               const opt = getStateOption(e.value);
               return `<div style="background:#1A1A2E;border-radius:10px;padding:12px 16px;border-left:3px solid ${opt.color}66;display:flex;gap:14px;align-items:flex-start;opacity:0.85;">
                 <div style="font-size:11px;color:#6B7280;min-width:32px;padding-top:2px;">${formatDate(e.date)}</div>
@@ -351,6 +386,7 @@
       await api(`/api/days/${S.targetDate}`, { method: 'PUT', body: { value: S.selected, note: S.note } });
       await loadEntries();
       S.saved = true;
+      S.confirmDelete = false;
       render();
       clearTimeout(handleSave.t);
       handleSave.t = setTimeout(() => { S.saved = false; if (S.mode === 'app' && S.view === 'input') render(); }, 2000);
@@ -367,10 +403,10 @@
   async function handleDeleteDay() {
     const t = targetEntry();
     if (!t) return;
-    if (!confirm(`${formatDate(t.date)} の記録（${getStateOption(t.value).label}）を消しますか？\n消した記録は「波を見る」の下のゴミ箱から戻せます。`)) return;
     try {
       await api(`/api/entries/${encodeURIComponent(t.id)}`, { method: 'DELETE' });
       await loadEntries();
+      S.confirmDelete = false;
       syncFromTarget();
       render();
     } catch (e) {
@@ -427,7 +463,7 @@
       await Promise.all([loadEntries(), loadTrash()]);
       syncFromTarget();
       let msg = `${r.read}件を読み込み、統合しました（合計${r.total}件）`;
-      if (r.replaced > 0) msg += `。同じ日の記録${r.replaced}件は読み込んだ方に置き換え、元の記録はゴミ箱に移しました`;
+      if (r.replaced > 0) msg += `。同じ日の記録${r.replaced}件は読み込んだ方に置き換え、元の記録は「消した記録」に移しました`;
       showImportMessage(msg, r.replaced > 0 ? 9000 : 5000);
     } catch (e) {
       if (e instanceof AuthError) return;
@@ -444,10 +480,12 @@
     const act = el.dataset.act;
     if (act === 'view') {
       S.view = el.dataset.v;
+      S.confirmDelete = false;
       if (S.view === 'log') loadTrash().then(() => { if (S.view === 'log') render(); });
       render();
     } else if (act === 'pick') {
       S.selected = Number(el.dataset.v);
+      S.touched = true;
       applySelection();
     } else if (act === 'save') {
       handleSave();
@@ -459,7 +497,13 @@
     } else if (act === 'import') {
       $('#importFile').click();
     } else if (act === 'delete-day') {
-      handleDeleteDay();
+      S.confirmDelete = true;            // 1段目：その場で「消す／やめる」に変える
+      refreshDayParts(false);
+    } else if (act === 'delete-no') {
+      S.confirmDelete = false;
+      refreshDayParts(false);
+    } else if (act === 'delete-yes') {
+      handleDeleteDay();                 // 2段目：ゴミ箱へ（論理削除）
     } else if (act === 'toggle-trash') {
       S.trashOpen = !S.trashOpen;
       render();
@@ -474,6 +518,7 @@
       if (!t.value) return;
       S.targetDate = t.value;
       S.saveError = '';
+      S.confirmDelete = false;
       syncFromTarget();
       render();
     } else if (t.id === 'importFile') {
@@ -484,7 +529,7 @@
   });
 
   document.addEventListener('input', (ev) => {
-    if (ev.target.id === 'noteInput') S.note = ev.target.value;
+    if (ev.target.id === 'noteInput') { S.note = ev.target.value; S.touched = true; }
   });
   // メモ欄の枠は、選んでいる状態の色に光る（旧版と同じ）
   document.addEventListener('focusin', (ev) => {
@@ -523,17 +568,44 @@
     setTimeout(() => { const k = $('#keyInput'); if (k) k.focus(); }, 50);
   }
 
+  function showNoKey() {
+    S.mode = 'gate';
+    S.gateNoKey = true;
+    S.gateMsg = '合言葉がまだ設定されていません。設定のしかたは README にあります。';
+    render();
+  }
+
+  /**
+   * 入力画面（日付と6つのボタン）は記録の読み込みを待たずに先に出す。
+   * 読み終えたら「もう記録済み」の注記と「消す」だけを後からふわっと差し込む。
+   * 合言葉が要るとき（401）は api() が合言葉の画面に切り替える。未設定（503 no_key）なら案内を出す。
+   */
   async function startApp() {
     S.mode = 'app';
     S.targetDate = todayStr();
+    S.loaded = false;
+    S.touched = false;
+    render();
     try {
       await loadEntries();
     } catch (e) {
       if (e instanceof AuthError) return;
+      if (e.code === 'no_key') { showNoKey(); return; }
       S.saveError = `記録を読み込めなかった。${e.message === 'Failed to fetch' ? '通信を確認して、開き直してください。' : e.message}`;
+      if (S.mode === 'app' && S.view === 'input') render();
+      return;
     }
-    syncFromTarget();
-    render();
+    S.loaded = true;
+    if (S.mode !== 'app') return;
+    if (S.view !== 'input') { syncFromTarget(); render(); return; }
+    // 読み終える前に選んだり書いたりしていたら、その入力を優先する
+    if (!S.touched) {
+      syncFromTarget();
+      applySelection();
+      const ta = $('#noteInput');
+      if (ta) ta.value = S.note;
+    }
+    refreshDayParts(true);
   }
 
   async function showEnvBanner() {
@@ -553,16 +625,7 @@
     render();
     showEnvBanner();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
-    let s;
-    try { s = await api('/api/session'); } catch { showGate('つながりませんでした。通信を確認して、開き直してください。'); return; }
-    if (!s.configured) {
-      S.mode = 'gate';
-      S.gateNoKey = true;
-      S.gateMsg = '合言葉がまだ設定されていません。設定のしかたは README にあります。';
-      render();
-      return;
-    }
-    if (!s.authed) { showGate(); return; }
+    // /api/session は呼ばずに、いきなり記録を読みにいく（往復を1回減らす。Cookie の期限延長もここで行われる）
     await startApp();
   }
 

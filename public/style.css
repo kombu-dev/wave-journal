@@ -14,3 +14,6 @@ html, body { margin: 0; padding: 0; background: #0F0F1A; overflow-x: hidden; }
   text-align: center;
 }
 .env-banner span { background: #f5c400; padding: 1px 8px; }
+
+/* 記録を読み終えてから差し込む「記録済み」の注記などを、ふわっと出す */
+@keyframes wj-fade { from { opacity: 0; } to { opacity: 1; } }
