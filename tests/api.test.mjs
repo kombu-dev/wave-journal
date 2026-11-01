@@ -20,7 +20,7 @@ function findHarness(start) {
     if (up === d) break;
     d = up;
   }
-  throw new Error('d1-harness.mjs が見つかりません（新たなる開発withclaude/.claude/skills/cloudflare-app-builder/scripts/）');
+  throw new Error('d1-harness.mjs が見つかりません（projects/.claude/skills/cloudflare-app-builder/scripts/）');
 }
 const { createApp, makeChecker } = await import(pathToFileURL(findHarness(root)).href);
 

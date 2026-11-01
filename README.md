@@ -53,7 +53,7 @@
 PowerShell で次の1行を実行し、`Enter a secret value:` と聞かれたら合言葉を打って Enter（打った文字は画面に出ない）。
 
 ```
-& "C:\Program Files\nodejs\npm.cmd" --prefix "C:\Users\Owner\Documents\新たなる開発withclaude\wave-journal-app" run set-key
+& "C:\Program Files\nodejs\npm.cmd" --prefix "C:\Users\Owner\Documents\projects\wave-journal-app" run set-key
 ```
 
 - 入れた直後から本番が開く（デプロイし直す必要はない）。
@@ -88,7 +88,7 @@ PowerShell で次の1行を実行し、`Enter a secret value:` と聞かれた�
 PowerShell では `npm` が実行ポリシーで止まるので `npm.cmd` を使う。
 
 ```
-& "C:\Program Files\nodejs\npm.cmd" --prefix "C:\Users\Owner\Documents\新たなる開発withclaude\wave-journal-app" run <script>
+& "C:\Program Files\nodejs\npm.cmd" --prefix "C:\Users\Owner\Documents\projects\wave-journal-app" run <script>
 ```
 
 | script | 内容 |
@@ -101,7 +101,7 @@ PowerShell では `npm` が実行ポリシーで止まるので `npm.cmd` を使
 | `set-key` | 本番の合言葉（APP_KEY）を決める・変える |
 | `icons` | `public/icon.svg` から PNG アイコン（iPhone 用など）を作り直す |
 
-テストは親フォルダ（`新たなる開発withclaude/.claude/skills/cloudflare-app-builder/scripts/d1-harness.mjs`）を使うので、このリポジトリ単体で clone した場所では動かない。
+テストは親フォルダ（`projects/.claude/skills/cloudflare-app-builder/scripts/d1-harness.mjs`）を使うので、このリポジトリ単体で clone した場所では動かない。
 
 ## 旧版から変えたところ
 
